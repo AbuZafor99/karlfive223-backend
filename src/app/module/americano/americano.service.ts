@@ -4,7 +4,6 @@ import { fileUploader } from "../../helper/fileUploded";
 import pagenation from "../../helper/pagenation";
 import { createAndSendNotifications } from "../../helper/socketHelper";
 import { IOption } from "../../interface";
-import { sendPushNotification } from "../../utils/sendPushNotification";
 import User from "../user/user.model";
 import { IAmericanoLeague } from "./americanoLeague.interface";
 import AmericanoLeague from "./americanoLeague.model";
@@ -373,7 +372,6 @@ const generateFixturesForLeague = async (league: IAmericanoLeague & any) => {
   if (uniquePlayerIds.length > 0) {
     const title = "🎾 Americano Fixtures Generated";
     const message = `Your fixtures for ${league.leagueName} (${matchesToInsert.length} matches) are now ready. Starting on ${new Date(league.startDate).toLocaleDateString()}.`;
-    await sendPushNotification(uniquePlayerIds, title, message);
     await createAndSendNotifications(uniquePlayerIds, title, message, "league", {
       entityType: "americanoLeague",
       relatedId: leagueId,
@@ -615,7 +613,6 @@ const submitMatchResult = async (
     const p2Message = `🤝 Your match vs ${playerOne.name} in ${leagueName} ended in a draw (${p2Goals}-${p1Goals})`;
 
     const leagueId = toObjectIdString(league._id);
-    await sendPushNotification([p1Id, p2Id], "Match Draw", p1Message);
     await createAndSendNotifications([p1Id], "Match Draw", p1Message, "match", {
       entityType: "americanoLeague",
       relatedId: leagueId,
@@ -636,12 +633,10 @@ const submitMatchResult = async (
     const loseMessage = `📉 You lost vs ${winner.name} in ${leagueName}. (${isP1Winner ? p2Goals : p1Goals}-${isP1Winner ? p1Goals : p2Goals})`;
     const leagueId = toObjectIdString(league._id);
 
-    await sendPushNotification([winnerId], "Match Won! 🏆", winMessage);
     await createAndSendNotifications([winnerId], "Match Won! 🏆", winMessage, "success", {
       entityType: "americanoLeague",
       relatedId: leagueId,
     });
-    await sendPushNotification([loserId], "Match Result", loseMessage);
     await createAndSendNotifications([loserId], "Match Lost", loseMessage, "match", {
       entityType: "americanoLeague",
       relatedId: leagueId,
@@ -985,7 +980,6 @@ const rescheduleMatch = async (
   if (leagueUser) notifyIds.push(leagueUser);
   const uniqueNotifyIds = [...new Set(notifyIds)];
 
-  await sendPushNotification(uniqueNotifyIds, "Match Rescheduled", message);
   await createAndSendNotifications(uniqueNotifyIds, "Match Rescheduled", message, "match", {
     entityType: "americanoLeague",
     relatedId: toObjectIdString(league._id),

@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { Server as SocketIOServer } from "socket.io";
 import { Notification } from "../module/notification/notification.model";
 import { NotificationEntityType } from "../module/notification/notifications.interface";
+import { sendPushNotification } from "../utils/sendPushNotification";
 
 let io: SocketIOServer | null = null;
 
@@ -196,6 +197,18 @@ export const createAndSendNotifications = async (
     }
 
     console.log(`✅ Created and sent ${notifications.length} notifications`);
+
+    // Best-effort FCM push (system tray / background / killed-app delivery)
+    // alongside the in-app DB + socket notification above — sendPushNotification
+    // already swallows its own errors, so a broker/FCM hiccup here can't
+    // fail notification creation for the in-app list.
+    await sendPushNotification(
+      uniqueUserIds,
+      title,
+      message,
+      entityType && relatedId ? { entityType, relatedId } : undefined
+    );
+
     return notifications;
   } catch (error) {
     console.error("❌ Error creating and sending notifications:", error);

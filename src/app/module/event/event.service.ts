@@ -1,6 +1,5 @@
 import AppError from "../../error/appError";
 import { createAndSendNotifications } from "../../helper/socketHelper";
-import { sendPushNotification } from "../../utils/sendPushNotification";
 import User from "../user/user.model";
 import { EVENT_STATUS } from "./event.constant";
 // import { EVENT_OTP_CONFIG } from "./event.constant"; // Legacy free-trial OTP flow disabled.
@@ -60,7 +59,6 @@ const createEvent = async (
   if (managerIds.length > 0) {
     const title = "New Event Request";
     const message = `📋 ${user.name} from ${payload.organizationName} has submitted a new event: "${payload.eventName}" for approval.`;
-    await sendPushNotification(managerIds.map((id) => id.toString()), title, message);
     await createAndSendNotifications(managerIds, title, message, "event");
   }
 
@@ -158,7 +156,6 @@ const approveEvent = async (eventId: string, managerEmail: string) => {
   if (creator && creator._id) {
     const title = "Event Approved! 🎉";
     const message = `✅ Your event "${event.eventName}" has been approved.`;
-    await sendPushNotification([creator._id.toString()], title, message);
     await createAndSendNotifications([creator._id], title, message, "success");
   }
 
@@ -203,7 +200,6 @@ const declineEvent = async (
     const reasonText = declineReason ? ` Reason: ${declineReason}` : "";
     const title = "Event Declined";
     const message = `❌ Your event "${event.eventName}" has been declined.${reasonText}`;
-    await sendPushNotification([creator._id.toString()], title, message);
     await createAndSendNotifications([creator._id], title, message, "warning");
   }
 

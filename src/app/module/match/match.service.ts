@@ -2,7 +2,6 @@ import AppError from "../../error/appError";
 import pagenation from "../../helper/pagenation";
 import { createAndSendNotifications } from "../../helper/socketHelper";
 import { IOption } from "../../interface";
-import { sendPushNotification } from "../../utils/sendPushNotification";
 import League from "../league/league.model";
 import { rebuildLeagueStandingsForCompletedMatches } from "../standing/standing.service";
 import Team from "../team/team.model";
@@ -147,8 +146,7 @@ const updateMatch = async (
     const formattedDate = `${month} ${day}, ${year}, ${formattedTime}`;
 
     const message = `📅 Match date updated: ${teamOne.teamName} vs ${teamTwo.teamName} in ${league.leagueName} has been rescheduled to ${formattedDate}`;
-      await sendPushNotification(userIds, "Match Rescheduled", message);
-    // Create notifications in DB and send via Socket.IO
+    // Create notifications in DB, send via Socket.IO, and push.
     await createAndSendNotifications(
       userIds,
       "Match Rescheduled",
@@ -212,7 +210,6 @@ const updateMatch = async (
 
       if (allUserIds.length) {
         const uniqueIds = [...new Set(allUserIds.map((id) => id.toString()))];
-        await sendPushNotification(uniqueIds, "Match Draw", message);
         await createAndSendNotifications(uniqueIds, "Match Draw", message, "match", {
           entityType: "normalLeague",
           relatedId: league._id,
@@ -232,7 +229,6 @@ const updateMatch = async (
       // bulk insert notifications (fast)
       if (winnerUserIds.length) {
         const uniqueIds = [...new Set(winnerUserIds.map((id) => id.toString()))];
-        await sendPushNotification(uniqueIds, "Match Won! 🏆", message);
         await createAndSendNotifications(uniqueIds, "Match Won! 🏆", message, "success", {
           entityType: "normalLeague",
           relatedId: league._id,
@@ -359,7 +355,6 @@ const rescheduleMatch = async (
       .padStart(2, "0")} ${ampm}`;
 
     const message = `📅 Match date updated: ${teamOne.teamName} vs ${teamTwo.teamName} in ${leagueName} has been rescheduled to ${formattedDate}`;
-    await sendPushNotification(userIds, "Match Rescheduled", message);
     await createAndSendNotifications(userIds, "Match Rescheduled", message, "match", {
       entityType: "normalLeague",
       relatedId: league._id,

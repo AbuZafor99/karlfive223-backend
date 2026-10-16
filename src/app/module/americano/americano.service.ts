@@ -19,6 +19,16 @@ const generateJoinOtp = () =>
 const toObjectIdString = (value: any) =>
   value?._id?.toString?.() || value?.toString?.() || "";
 
+// Free one-day Americanos are private to their creator and only served by
+// the /free-americano routes, so the shared endpoints treat them as missing.
+const NOT_FREE = { eventType: { $ne: "free" } };
+
+const assertNotFree = (league: any) => {
+  if (league?.eventType === "free") {
+    throw new AppError(404, "Americano league not found");
+  }
+};
+
 const generateFixturesOrdered = (
   playerIdsInput: mongoose.Types.ObjectId[],
   legs = 1
@@ -267,6 +277,7 @@ const joinLeague = async (email: string, leagueId: string) => {
 
   const league = await AmericanoLeague.findById(leagueId);
   if (!league) throw new AppError(404, "Americano league not found");
+  assertNotFree(league);
 
   return joinLeagueWithValidations(league, user._id.toString());
 };
@@ -279,7 +290,10 @@ const joinLeagueByOtp = async (email: string, otp: string) => {
     throw new AppError(400, "OTP is required");
   }
 
-  const league = await AmericanoLeague.findOne({ joinOtp: String(otp).trim() });
+  const league = await AmericanoLeague.findOne({
+    joinOtp: String(otp).trim(),
+    ...NOT_FREE,
+  });
   if (!league) throw new AppError(404, "Invalid OTP");
 
   return joinLeagueWithValidations(league, user._id.toString());
@@ -321,6 +335,7 @@ const joinLeagueWithValidations = async (
 const generateFixtures = async (leagueId: string, currentUserId: string) => {
   const league = await AmericanoLeague.findById(leagueId);
   if (!league) throw new AppError(404, "Americano league not found");
+  assertNotFree(league);
 
   if (league.user.toString() !== currentUserId.toString()) {
     throw new AppError(403, "Only league owner can generate fixtures");
@@ -369,7 +384,8 @@ const generateFixturesForLeague = async (league: IAmericanoLeague & any) => {
     ...new Set<string>(playerIds.map((player: mongoose.Types.ObjectId) => player.toString())),
   ];
 
-  if (uniquePlayerIds.length > 0) {
+  // Free one-day Americano players are names only, with no account to notify.
+  if (uniquePlayerIds.length > 0 && league.eventType !== "free") {
     const title = "🎾 Americano Fixtures Generated";
     const message = `Your fixtures for ${league.leagueName} (${matchesToInsert.length} matches) are now ready. Starting on ${new Date(league.startDate).toLocaleDateString()}.`;
     await createAndSendNotifications(uniquePlayerIds, title, message, "league", {
@@ -398,6 +414,7 @@ const autoGenerateFixturesForDueLeagues = async () => {
 
   // Query: leagues starting today OR leagues with past startDate that haven't generated fixtures
   const dueLeagues = await AmericanoLeague.find({
+    ...NOT_FREE,
     $or: [
       // Leagues starting today
       { startDate: { $gte: startOfDay, $lte: endOfDay }, fixturesGenerated: false },
@@ -442,7 +459,7 @@ const listLeagues = async (params: any, options: IOption) => {
   const { page, limit, skip, sortBy, sortOrder } = pagenation(options);
   const { searchTerm, ...filterData } = params;
 
-  const andCondition: any[] = [];
+  const andCondition: any[] = [NOT_FREE];
 
   if (searchTerm) {
     andCondition.push({
@@ -480,7 +497,7 @@ const listLeagues = async (params: any, options: IOption) => {
 };
 
 const getLeagueById = async (leagueId: string) => {
-  const league = await AmericanoLeague.findById(leagueId)
+  const league = await AmericanoLeague.findOne({ _id: leagueId, ...NOT_FREE })
     .populate("user", "name email")
     .populate("players", "name email");
 
@@ -489,7 +506,7 @@ const getLeagueById = async (leagueId: string) => {
 };
 
 const getLeagueFixtures = async (leagueId: string) => {
-  const league = await AmericanoLeague.findById(leagueId).select("_id leagueName");
+  const league = await AmericanoLeague.findOne({ _id: leagueId, ...NOT_FREE }).select("_id leagueName");
   if (!league) throw new AppError(404, "Americano league not found");
 
   return AmericanoMatch.find({ league: leagueId })
@@ -500,7 +517,7 @@ const getLeagueFixtures = async (leagueId: string) => {
 };
 
 const getLeagueMatches = async (leagueId: string) => {
-  const league = await AmericanoLeague.findById(leagueId).select("_id leagueName");
+  const league = await AmericanoLeague.findOne({ _id: leagueId, ...NOT_FREE }).select("_id leagueName");
   if (!league) throw new AppError(404, "Americano league not found");
 
   return AmericanoMatch.find({ league: leagueId })
@@ -511,7 +528,7 @@ const getLeagueMatches = async (leagueId: string) => {
 };
 
 const getLeagueStandings = async (leagueId: string) => {
-  const league = await AmericanoLeague.findById(leagueId).select("_id");
+  const league = await AmericanoLeague.findOne({ _id: leagueId, ...NOT_FREE }).select("_id");
   if (!league) throw new AppError(404, "Americano league not found");
 
   return AmericanoStanding.find({ league: leagueId })
@@ -528,6 +545,7 @@ const getMyLeagues = async (email: string, options: IOption) => {
   const userId = user._id;
 
   const whereCondition = {
+    ...NOT_FREE,
     $or: [
       { user: userId },
       { players: userId },
@@ -555,10 +573,11 @@ const submitMatchResult = async (
   currentUserId: string
 ) => {
   const match = await AmericanoMatch.findById(matchId)
-    .populate("league", "user leagueName")
+    .populate("league", "user leagueName eventType")
     .populate("playerOne", "name email")
     .populate("playerTwo", "name email");
   if (!match) throw new AppError(404, "Americano match not found");
+  assertNotFree(match.league);
 
   const leagueUser = (match.league as any)?.user?.toString?.();
   if (!leagueUser || leagueUser !== currentUserId.toString()) {
@@ -649,7 +668,7 @@ const submitMatchResult = async (
     .populate("winnerPlayer", "name email");
 };
 const getShareableOtp = async (leagueId: string) => {
-  const league = await AmericanoLeague.findById(leagueId).select("joinOtp leagueName");
+  const league = await AmericanoLeague.findOne({ _id: leagueId, ...NOT_FREE }).select("joinOtp leagueName");
   if (!league) throw new AppError(404, "Americano league not found");
 
   return {
@@ -660,7 +679,7 @@ const getShareableOtp = async (leagueId: string) => {
 };
 
 const getLeaguePlayers = async (leagueId: string) => {
-  const league = await AmericanoLeague.findById(leagueId)
+  const league = await AmericanoLeague.findOne({ _id: leagueId, ...NOT_FREE })
     .select("players")
     .populate({
       path: "players",
@@ -678,6 +697,7 @@ const removePlayerFromLeague = async (
 ) => {
   const league = await AmericanoLeague.findById(leagueId);
   if (!league) throw new AppError(404, "Americano league not found");
+  assertNotFree(league);
 
   if (league.user.toString() !== currentUserId.toString()) {
     throw new AppError(403, "Only league owner can remove players");
@@ -702,6 +722,7 @@ const updateLeague = async (
 ) => {
   const league = await AmericanoLeague.findById(leagueId);
   if (!league) throw new AppError(404, "Americano league not found");
+  assertNotFree(league);
 
   if (league.user.toString() !== currentUserId.toString()) {
     throw new AppError(403, "Only league owner can update league");
@@ -740,6 +761,7 @@ const updateLeague = async (
 const deleteLeague = async (leagueId: string, currentUserId: string) => {
   const league = await AmericanoLeague.findById(leagueId);
   if (!league) throw new AppError(404, "Americano league not found");
+  assertNotFree(league);
 
   if (league.user.toString() !== currentUserId.toString()) {
     throw new AppError(403, "Only league owner can delete league");
@@ -757,12 +779,13 @@ const deleteLeague = async (leagueId: string, currentUserId: string) => {
 
 const getMatchScore = async (matchId: string) => {
   const match = await AmericanoMatch.findById(matchId)
-    .populate("league", "leagueName")
+    .populate("league", "leagueName eventType")
     .populate("playerOne", "name email profileImage")
     .populate("playerTwo", "name email profileImage")
     .populate("winnerPlayer", "name email profileImage");
 
   if (!match) throw new AppError(404, "Americano match not found");
+  assertNotFree(match.league);
 
   const sets = match.matchScore?.sets || [];
   const playerOneTotalGames = sets.reduce(
@@ -838,10 +861,11 @@ const editMatchScore = async (
   currentUserId: string
 ) => {
   const match = await AmericanoMatch.findById(matchId)
-    .populate("league", "user")
+    .populate("league", "user eventType")
     .populate("playerOne", "name email")
     .populate("playerTwo", "name email");
   if (!match) throw new AppError(404, "Americano match not found");
+  assertNotFree(match.league);
 
   if (match.matchStatus !== "completed") {
     throw new AppError(400, "Only completed match scores can be corrected");
@@ -890,8 +914,9 @@ const assignCourtNumber = async (
   courtNumber: number,
   currentUserId: string
 ) => {
-  const match = await AmericanoMatch.findById(matchId).populate("league", "user");
+  const match = await AmericanoMatch.findById(matchId).populate("league", "user eventType");
   if (!match) throw new AppError(404, "Americano match not found");
+  assertNotFree(match.league);
 
   const leagueUser = (match.league as any)?.user?.toString?.();
   if (!leagueUser || leagueUser !== currentUserId.toString()) {
@@ -916,8 +941,9 @@ const updateMatch = async (
   payload: Partial<IAmericanoMatch>,
   currentUserId: string
 ) => {
-  const match = await AmericanoMatch.findById(matchId).populate("league", "user");
+  const match = await AmericanoMatch.findById(matchId).populate("league", "user eventType");
   if (!match) throw new AppError(404, "Americano match not found");
+  assertNotFree(match.league);
 
   const leagueUser = (match.league as any)?.user?.toString?.();
   if (!leagueUser || leagueUser !== currentUserId.toString()) {
@@ -947,10 +973,11 @@ const rescheduleMatch = async (
   currentUserId: string
 ) => {
   const match = await AmericanoMatch.findById(matchId)
-    .populate("league", "user leagueName")
+    .populate("league", "user leagueName eventType")
     .populate("playerOne", "name")
     .populate("playerTwo", "name");
   if (!match) throw new AppError(404, "Americano match not found");
+  assertNotFree(match.league);
 
   const league = match.league as any;
   const leagueUser = league?.user?.toString?.();
@@ -992,8 +1019,9 @@ const rescheduleMatch = async (
 };
 
 const deleteMatch = async (matchId: string, currentUserId: string) => {
-  const match = await AmericanoMatch.findById(matchId).populate("league", "user");
+  const match = await AmericanoMatch.findById(matchId).populate("league", "user eventType");
   if (!match) throw new AppError(404, "Americano match not found");
+  assertNotFree(match.league);
 
   const leagueUser = (match.league as any)?.user?.toString?.();
   if (!leagueUser || leagueUser !== currentUserId.toString()) {
@@ -1011,6 +1039,7 @@ export const americanoService = {
   joinLeague,
   joinLeagueByOtp,
   generateFixtures,
+  generateFixturesForLeague,
   listLeagues,
   getMyLeagues,
   getLeagueById,

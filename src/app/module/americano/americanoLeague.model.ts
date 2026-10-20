@@ -21,6 +21,15 @@ const americanoLeagueSchema = new mongoose.Schema<IAmericanoLeague>(
       enum: ["Once", "Twice", "Thrice"],
       default: "Once",
     },
+    eventType: {
+      type: String,
+      enum: ["single", "free"],
+      default: "single",
+      index: true,
+    },
+    completedAt: { type: Date, default: null },
+    deleteAt: { type: Date, default: null, index: true },
+    deletionReminderSent: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

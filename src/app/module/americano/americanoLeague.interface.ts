@@ -14,4 +14,9 @@ export interface IAmericanoLeague extends Document {
   maxPlayers?: number;
   fixturesGenerated: boolean;
   matchPlay?: "Once" | "Twice" | "Thrice";
+  /** "free" = the private one-day Americano served by /free-americano. */
+  eventType: "single" | "free";
+  completedAt?: Date | null;
+  deleteAt?: Date | null;
+  deletionReminderSent: boolean;
 }

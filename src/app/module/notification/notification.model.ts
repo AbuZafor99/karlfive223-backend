@@ -9,7 +9,7 @@ const NotificationSchema = new Schema<INotification>({
   read: { type: Boolean, default: false },
   entityType: {
     type: String,
-    enum: ['normalLeague', 'americanoLeague', 'dualAmericanoEvent', 'team', 'chat'],
+    enum: ['normalLeague', 'americanoLeague', 'dualAmericanoEvent', 'freeAmericano', 'team', 'chat'],
     required: false,
   },
   relatedId: { type: String, required: false },

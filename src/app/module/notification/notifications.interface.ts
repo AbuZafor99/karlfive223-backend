@@ -6,6 +6,7 @@ export type NotificationEntityType =
   | "normalLeague"
   | "americanoLeague"
   | "dualAmericanoEvent"
+  | "freeAmericano"
   | "team"
   | "chat";
 
